@@ -36,17 +36,19 @@ import {
   LayoutDashboard,
   Download,
   Mic,
-  MicOff
+  MicOff,
+  Cloud
 } from "lucide-react";
 import { Task, HabitGoal, ChatMessage, KickstartDraft, MicroStep } from "./types";
 import { formatCountdown, getUrgencyBadgeColor } from "./utils";
 import FocusTimer from "./components/FocusTimer";
 import EisenhowerMatrix from "./components/EisenhowerMatrix";
 import DashboardView from "./components/DashboardView";
+import DriveBackupView from "./components/DriveBackupView";
 
 // Firebase imports
 import { auth, db, googleProvider, signInWithPopup, signOut } from "./lib/firebase";
-import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
+import { onAuthStateChanged, User as FirebaseUser, GoogleAuthProvider } from "firebase/auth";
 import { collection, doc, setDoc, getDocs, deleteDoc, query, where, writeBatch } from "firebase/firestore";
 
 enum OperationType {
@@ -171,7 +173,7 @@ export default function App() {
   const [activeSprintStepIndex, setActiveSprintStepIndex] = useState<number>(-1);
   const [isDeconstructing, setIsDeconstructing] = useState<string | null>(null); // Task ID
   const [isPrioritizing, setIsPrioritizing] = useState(false);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "eisenhower" | "drafts" | "habits" | "spots">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "eisenhower" | "drafts" | "habits" | "spots" | "drive">("dashboard");
   
   // Kickstart Draft Generator state
   const [draftTaskTitle, setDraftTaskTitle] = useState("");
@@ -209,6 +211,9 @@ export default function App() {
   const recognitionRef = useRef<any>(null);
   const originalInputRef = useRef<string>("");
   const isSpeechSupported = typeof window !== "undefined" && (!!(window as any).SpeechRecognition || !!(window as any).webkitSpeechRecognition);
+
+  // Google Drive state
+  const [driveAccessToken, setDriveAccessToken] = useState<string | null>(null);
 
   // Theme state
   const [theme, setTheme] = useState<"light" | "dark">(
@@ -353,7 +358,14 @@ export default function App() {
 
   const handleGoogleSignIn = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(auth, googleProvider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (credential?.accessToken) {
+        setDriveAccessToken(credential.accessToken);
+        showToast("Signed in and connected to Google Drive!", "success");
+      } else {
+        showToast("Signed in successfully!", "success");
+      }
     } catch (err: any) {
       console.error("Sign in failed:", err);
       showToast("Sign-in failed. Please try again.", "error");
@@ -363,9 +375,49 @@ export default function App() {
   const handleSignOut = async () => {
     try {
       await signOut(auth);
+      setDriveAccessToken(null);
       showToast("Signed out successfully", "info");
     } catch (err: any) {
       console.error("Sign out failed:", err);
+    }
+  };
+
+  const handleRestoreData = async (restoredTasks: Task[], restoredHabits: HabitGoal[]) => {
+    setTasks(restoredTasks);
+    setHabits(restoredHabits);
+
+    if (user) {
+      try {
+        const updatedTasks = restoredTasks.map((t) => {
+          const suffix = `-${user.uid}`;
+          const newId = t.id.endsWith(suffix) ? t.id : `${t.id}${suffix}`;
+          return { ...t, id: newId, userId: user.uid };
+        });
+        const updatedHabits = restoredHabits.map((h) => {
+          const suffix = `-${user.uid}`;
+          const newId = h.id.endsWith(suffix) ? h.id : `${h.id}${suffix}`;
+          return { ...h, id: newId, userId: user.uid };
+        });
+
+        const batch = writeBatch(db);
+        updatedTasks.forEach((t) => {
+          const docRef = doc(db, "tasks", t.id);
+          batch.set(docRef, t);
+        });
+        updatedHabits.forEach((h) => {
+          const docRef = doc(db, "habits", h.id);
+          batch.set(docRef, h);
+        });
+        await batch.commit();
+        setTasks(updatedTasks);
+        setHabits(updatedHabits);
+      } catch (err) {
+        console.error("Failed to sync restored data to Firestore:", err);
+        showToast("Restored locally, but cloud database sync failed.", "error");
+      }
+    } else {
+      localStorage.setItem("lmls_tasks", JSON.stringify(restoredTasks));
+      localStorage.setItem("lmls_habits", JSON.stringify(restoredHabits));
     }
   };
 
@@ -1092,6 +1144,16 @@ export default function App() {
                 <MapPin className="w-3.5 h-3.5" />
                 <span>Hideouts</span>
               </button>
+              <button
+                onClick={() => setActiveTab("drive")}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                  activeTab === "drive" ? "bg-slate-800 text-slate-100 shadow-sm" : "text-slate-400 hover:text-slate-200"
+                }`}
+                id="tab-drive"
+              >
+                <Cloud className="w-3.5 h-3.5 text-sky-400" />
+                <span>Drive Backup</span>
+              </button>
             </nav>
 
             {/* Download CSV Backup Button */}
@@ -1762,6 +1824,18 @@ export default function App() {
                   </div>
                 )}
               </div>
+            )}
+
+            {/* Google Drive Cloud Backup View */}
+            {activeTab === "drive" && (
+              <DriveBackupView
+                tasks={tasks}
+                habits={habits}
+                driveAccessToken={driveAccessToken}
+                onLinkDrive={handleGoogleSignIn}
+                onRestoreData={handleRestoreData}
+                showToast={showToast}
+              />
             )}
 
           </div>

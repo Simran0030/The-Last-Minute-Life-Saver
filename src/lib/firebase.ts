@@ -14,6 +14,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
+googleProvider.addScope("https://www.googleapis.com/auth/drive.file");
+googleProvider.addScope("https://www.googleapis.com/auth/drive.readonly");
 
 // Custom databaseId is specified for Firestore
 const db = getFirestore(app, "ai-studio-thelastminutelif-fb1e79bc-b3bf-4bea-b475-69c52c8cc269");
