@@ -1,0 +1,6 @@
+{
+  "name": "The Last-Minute Life Saver",
+  "description": "An AI-powered productivity companion that proactively deconstructs tasks, defeats procrastination, and helps you beat deadlines with actionable micro-sprints.",
+  "requestFramePermissions": ["geolocation", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

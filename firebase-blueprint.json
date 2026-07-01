@@ -1,0 +1,46 @@
+{
+  "entities": {
+    "Task": {
+      "title": "Task",
+      "description": "An action-oriented task or sprint representing user progress.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "deadline": { "type": "string" },
+        "durationEstimate": { "type": "string" },
+        "category": { "type": "string" },
+        "attentionLevel": { "type": "string" },
+        "reasoning": { "type": "string" },
+        "completed": { "type": "boolean" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "title", "userId", "completed"]
+    },
+    "HabitGoal": {
+      "title": "HabitGoal",
+      "description": "A habit tracked by the user.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "frequency": { "type": "string" },
+        "streak": { "type": "integer" },
+        "slipUpGraceUsed": { "type": "boolean" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "title", "frequency", "streak", "slipUpGraceUsed", "userId"]
+    }
+  },
+  "firestore": {
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Collection of tasks."
+    },
+    "/habits/{habitId}": {
+      "schema": "HabitGoal",
+      "description": "Collection of habits."
+    }
+  }
+}
